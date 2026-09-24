@@ -1,3 +1,4 @@
+require("../database/database");
 const request = require("supertest");
 const app = require("../service");
 
