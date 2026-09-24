@@ -1,4 +1,3 @@
-require("../database/database");
 const request = require("supertest");
 const app = require("../service");
 
@@ -10,6 +9,20 @@ beforeAll(async () => {
   const registerRes = await request(app).post("/api/auth").send(testUser);
   testUserAuthToken = registerRes.body.token;
   expectValidJwt(testUserAuthToken);
+
+  const loginRes = await request(app)
+    .put("/api/auth")
+    .send({ email: "a@jwt.com", password: "admin" });
+  let adminAuthToken = loginRes.body.token;
+  await request(app)
+    .put("/api/order/menu")
+    .set("Authorization", `Bearer ${adminAuthToken}`)
+    .send({
+      title: "Crusty",
+      description: "A dry mouthed favorite",
+      image: "pizza4.png",
+      price: 0.0028,
+    });
 });
 
 test("login", async () => {
