@@ -1,45 +1,17 @@
 const request = require("supertest");
 const app = require("../service");
-const { Role, DB } = require("../database/database.js");
-
-function randomName() {
-  return Math.random().toString(36).substring(2, 12);
-}
-
-async function createAdminUser() {
-  let user = { password: "toomanysecrets", roles: [{ role: Role.Admin }] };
-  user.name = randomName();
-  user.email = user.name + "@admin.com";
-
-  user = await DB.addUser(user);
-  return { ...user, password: "toomanysecrets" };
-}
-
-async function createDinerUser() {
-  let user = { password: "dinersecret", roles: [{ role: Role.Diner }] };
-  user.name = randomName();
-  user.email = user.name + "@diner.com";
-
-  user = await DB.addUser(user);
-  return { ...user, password: "dinersecret" };
-}
+const { Role, createUser, login, uniqueName } = require("./testHelpers");
 
 let adminUser;
 let adminAuthToken;
 
 beforeAll(async () => {
-  adminUser = await createAdminUser();
-  const loginRes = await request(app).put("/api/auth").send({
-    email: adminUser.email,
-    password: adminUser.password,
-  });
-
-  expect(loginRes.status).toBe(200);
-  adminAuthToken = loginRes.body.token;
+  adminUser = await createUser(Role.Admin);
+  adminAuthToken = await login(adminUser);
 });
 
 test("admin can create a franchise", async () => {
-  const franchiseName = `Test Franchise ${randomName()}`;
+  const franchiseName = `Test Franchise ${uniqueName("franchise")}`;
   const createRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -63,7 +35,7 @@ test("admin can create a franchise", async () => {
 });
 
 test("admin can delete a franchise", async () => {
-  const franchiseName = `To Delete ${randomName()}`;
+  const franchiseName = `To Delete ${uniqueName("franchise")}`;
   const createRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -83,19 +55,14 @@ test("admin can delete a franchise", async () => {
 });
 
 test("throws StatusCodeError for non-admin franchise creation", async () => {
-  const dinerUser = await createDinerUser();
-  const loginRes = await request(app).put("/api/auth").send({
-    email: dinerUser.email,
-    password: dinerUser.password,
-  });
-
-  expect(loginRes.status).toBe(200);
+  const dinerUser = await createUser();
+  const dinerAuthToken = await login(dinerUser);
 
   const createRes = await request(app)
     .post("/api/franchise")
-    .set("Authorization", `Bearer ${loginRes.body.token}`)
+    .set("Authorization", `Bearer ${dinerAuthToken}`)
     .send({
-      name: `Forbidden ${randomName()}`,
+      name: `Forbidden ${uniqueName("franchise")}`,
       admins: [{ email: dinerUser.email }],
     });
 
@@ -104,7 +71,7 @@ test("throws StatusCodeError for non-admin franchise creation", async () => {
 });
 
 test("admin can create a store within a franchise", async () => {
-  const franchiseName = `Franchise with Store ${randomName()}`;
+  const franchiseName = `Franchise with Store ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -115,7 +82,7 @@ test("admin can create a store within a franchise", async () => {
 
   expect(franchiseRes.status).toBe(200);
 
-  const storeName = `Store ${randomName()}`;
+  const storeName = `Store ${uniqueName("store")}`;
   const storeRes = await request(app)
     .post(`/api/franchise/${franchiseRes.body.id}/store`)
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -131,7 +98,7 @@ test("admin can create a store within a franchise", async () => {
 });
 
 test("admin can delete a store within a franchise", async () => {
-  const franchiseName = `Franchise to Remove Store ${randomName()}`;
+  const franchiseName = `Franchise to Remove Store ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -145,7 +112,7 @@ test("admin can delete a store within a franchise", async () => {
   const storeRes = await request(app)
     .post(`/api/franchise/${franchiseRes.body.id}/store`)
     .set("Authorization", `Bearer ${adminAuthToken}`)
-    .send({ name: `Store to Remove ${randomName()}` });
+    .send({ name: `Store to Remove ${uniqueName("store")}` });
 
   expect(storeRes.status).toBe(200);
 
@@ -158,7 +125,7 @@ test("admin can delete a store within a franchise", async () => {
 });
 
 test("admin can get a franchise", async () => {
-  const franchiseName = `Franchise to Get ${randomName()}`;
+  const franchiseName = `Franchise to Get ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -186,15 +153,10 @@ test("admin can get a franchise", async () => {
 });
 
 test("user can get all their franchises", async () => {
-  const dinerUser = await createDinerUser();
-  const dinerLogin = await request(app).put("/api/auth").send({
-    email: dinerUser.email,
-    password: dinerUser.password,
-  });
+  const dinerUser = await createUser();
+  const dinerAuthToken = await login(dinerUser);
 
-  expect(dinerLogin.status).toBe(200);
-
-  const franchiseName = `User Franchise ${randomName()}`;
+  const franchiseName = `User Franchise ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -207,7 +169,7 @@ test("user can get all their franchises", async () => {
 
   const userFranchesRes = await request(app)
     .get(`/api/franchise/${dinerUser.id}`)
-    .set("Authorization", `Bearer ${dinerLogin.body.token}`);
+    .set("Authorization", `Bearer ${dinerAuthToken}`);
 
   expect(userFranchesRes.status).toBe(200);
   expect(userFranchesRes.body).toEqual(
@@ -221,8 +183,8 @@ test("user can get all their franchises", async () => {
 });
 
 test("admin can get another user's franchises when req.user.isRole(Role.Admin)", async () => {
-  const dinerUser = await createDinerUser();
-  const franchiseName = `Admin View User Franchise ${randomName()}`;
+  const dinerUser = await createUser();
+  const franchiseName = `Admin View User Franchise ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -249,15 +211,10 @@ test("admin can get another user's franchises when req.user.isRole(Role.Admin)",
 });
 
 test("throws StatusCodeError for unauthorized store creation", async () => {
-  const dinerUser = await createDinerUser();
-  const dinerLogin = await request(app).put("/api/auth").send({
-    email: dinerUser.email,
-    password: dinerUser.password,
-  });
+  const dinerUser = await createUser();
+  const dinerAuthToken = await login(dinerUser);
 
-  expect(dinerLogin.status).toBe(200);
-
-  const franchiseName = `Unauthorized Store Franchise ${randomName()}`;
+  const franchiseName = `Unauthorized Store Franchise ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -270,23 +227,18 @@ test("throws StatusCodeError for unauthorized store creation", async () => {
 
   const storeRes = await request(app)
     .post(`/api/franchise/${franchiseRes.body.id}/store`)
-    .set("Authorization", `Bearer ${dinerLogin.body.token}`)
-    .send({ name: `Blocked Store ${randomName()}` });
+    .set("Authorization", `Bearer ${dinerAuthToken}`)
+    .send({ name: `Blocked Store ${uniqueName("store")}` });
 
   expect(storeRes.status).toBe(403);
   expect(storeRes.body.message).toBe("unable to create a store");
 });
 
 test("throws StatusCodeError for unauthorized store deletion", async () => {
-  const dinerUser = await createDinerUser();
-  const dinerLogin = await request(app).put("/api/auth").send({
-    email: dinerUser.email,
-    password: dinerUser.password,
-  });
+  const dinerUser = await createUser();
+  const dinerAuthToken = await login(dinerUser);
 
-  expect(dinerLogin.status).toBe(200);
-
-  const franchiseName = `Unauthorized Store Deletion Franchise ${randomName()}`;
+  const franchiseName = `Unauthorized Store Deletion Franchise ${uniqueName("franchise")}`;
   const franchiseRes = await request(app)
     .post("/api/franchise")
     .set("Authorization", `Bearer ${adminAuthToken}`)
@@ -300,13 +252,13 @@ test("throws StatusCodeError for unauthorized store deletion", async () => {
   const storeRes = await request(app)
     .post(`/api/franchise/${franchiseRes.body.id}/store`)
     .set("Authorization", `Bearer ${adminAuthToken}`)
-    .send({ name: `Delete Blocked Store ${randomName()}` });
+    .send({ name: `Delete Blocked Store ${uniqueName("store")}` });
 
   expect(storeRes.status).toBe(200);
 
   const deleteRes = await request(app)
     .delete(`/api/franchise/${franchiseRes.body.id}/store/${storeRes.body.id}`)
-    .set("Authorization", `Bearer ${dinerLogin.body.token}`);
+    .set("Authorization", `Bearer ${dinerAuthToken}`);
 
   expect(deleteRes.status).toBe(403);
   expect(deleteRes.body.message).toBe("unable to delete a store");

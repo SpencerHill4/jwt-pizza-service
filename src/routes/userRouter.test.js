@@ -1,34 +1,6 @@
 const request = require("supertest");
 const app = require("../service");
-const { Role, DB } = require("../database/database.js");
-
-function uniqueValue(prefix) {
-  return `${prefix}-${Math.random().toString(36).substring(2, 12)}`;
-}
-
-async function createUser(role = Role.Diner) {
-  const password = "password123";
-  const name = uniqueValue("User");
-  const email = `${uniqueValue("user")}@test.com`;
-  const user = await DB.addUser({
-    name,
-    email,
-    password,
-    roles: [{ role }],
-  });
-
-  return { ...user, password };
-}
-
-async function login(user) {
-  const loginRes = await request(app).put("/api/auth").send({
-    email: user.email,
-    password: user.password,
-  });
-
-  expect(loginRes.status).toBe(200);
-  return loginRes.body.token;
-}
+const { Role, createUser, login, uniqueName } = require("./testHelpers");
 
 let dinerUser;
 let dinerAuthToken;
@@ -70,8 +42,8 @@ test("updates the authenticated user's profile and returns a new token", async (
   const user = await createUser();
   const authToken = await login(user);
   const updatedUser = {
-    name: uniqueValue("Updated"),
-    email: `${uniqueValue("updated")}@test.com`,
+    name: uniqueName("Updated"),
+    email: `${uniqueName("updated")}@test.com`,
     password: "newpassword123",
   };
 
@@ -103,8 +75,8 @@ test("updates the authenticated user's profile and returns a new token", async (
 test("allows an admin to update another user", async () => {
   const user = await createUser();
   const update = {
-    name: uniqueValue("Admin Updated"),
-    email: `${uniqueValue("admin-updated")}@test.com`,
+    name: uniqueName("Admin Updated"),
+    email: `${uniqueName("admin-updated")}@test.com`,
     password: "adminupdated123",
   };
 
@@ -131,7 +103,7 @@ test("rejects a diner updating another user", async () => {
     .set("Authorization", `Bearer ${dinerAuthToken}`)
     .send({
       name: "Unauthorized update",
-      email: `${uniqueValue("blocked")}@test.com`,
+      email: `${uniqueName("blocked")}@test.com`,
       password: "blockedpassword",
     });
 
