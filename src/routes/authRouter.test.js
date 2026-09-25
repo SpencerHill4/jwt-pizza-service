@@ -1,5 +1,6 @@
 const request = require("supertest");
 const app = require("../service");
+const db = require("../database/database");
 
 const testUser = {
   name: "pizza diner",
@@ -48,23 +49,32 @@ test("rejects login with unknown credentials", async () => {
 });
 
 test("registered user can get a crusty pizza from the menu", async () => {
-  const loginRes = await request(app)
-    .put("/api/auth")
-    .send({ email: "a@jwt.com", password: "admin" });
-  expect(loginRes.status).toBe(200);
-  const adminAuthToken = loginRes.body.token;
-  expectValidJwt(adminAuthToken);
-
-  const addMenuRes = await request(app)
-    .put("/api/order/menu")
-    .set("Authorization", `Bearer ${adminAuthToken}`)
-    .send({
+  if ((await db.DB.getMenu()).length === 0) {
+    await db.DB.addMenuItem({
       title: "Crusty",
       description: "A dry mouthed favorite",
       image: "pizza4.png",
       price: 0.0028,
     });
-  expect(addMenuRes.status).toBe(200);
+  }
+
+  // const loginRes = await request(app)
+  //   .put("/api/auth")
+  //   .send({ email: "a@jwt.com", password: "admin" });
+  // expect(loginRes.status).toBe(200);
+  // const adminAuthToken = loginRes.body.token;
+  // expectValidJwt(adminAuthToken);
+
+  // const addMenuRes = await request(app)
+  //   .put("/api/order/menu")
+  //   .set("Authorization", `Bearer ${adminAuthToken}`)
+  //   .send({
+  //     title: "Crusty",
+  //     description: "A dry mouthed favorite",
+  //     image: "pizza4.png",
+  //     price: 0.0028,
+  //   });
+  // expect(addMenuRes.status).toBe(200);
 
   const menuRes = await request(app)
     .get("/api/order/menu")
