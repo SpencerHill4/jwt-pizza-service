@@ -7,36 +7,44 @@ function uniqueName(prefix) {
   return `${prefix} ${Math.random().toString(36).substring(2, 12)}`;
 }
 
+async function createUser(role = Role.Diner) {
+  const password = "password123";
+  const name = uniqueName("User");
+  const email = `${uniqueName("user")}@test.com`;
+  const user = await DB.addUser({
+    name,
+    email,
+    password,
+    roles: [{ role }],
+  });
+
+  return { ...user, password };
+}
+
+async function login(user) {
+  const loginRes = await request(app).put("/api/auth").send({
+    email: user.email,
+    password: user.password,
+  });
+
+  expect(loginRes.status).toBe(200);
+  return loginRes.body.token;
+}
+
 let dinerUser;
 let dinerAuthToken;
+let adminUser;
 let adminAuthToken;
 let franchise;
 let store;
 let pepperoniMenuItem;
 
 beforeAll(async () => {
-  dinerUser = await DB.addUser({
-    name: uniqueName("Diner"),
-    email: `${Math.random().toString(36).substring(2, 12)}@diner.com`,
-    password: "dinersecret",
-    roles: [{ role: Role.Diner }],
-  });
+  dinerUser = await createUser();
+  dinerAuthToken = await login(dinerUser);
+  adminUser = await createUser(Role.Admin);
+  adminAuthToken = await login(adminUser);
 
-  const dinerLogin = await request(app).put("/api/auth").send({
-    email: dinerUser.email,
-    password: "dinersecret",
-  });
-  expect(dinerLogin.status).toBe(200);
-  dinerAuthToken = dinerLogin.body.token;
-
-  const adminLogin = await request(app).put("/api/auth").send({
-    email: "a@jwt.com",
-    password: "admin",
-  });
-  expect(adminLogin.status).toBe(200);
-  adminAuthToken = adminLogin.body.token;
-
-  const adminUser = adminLogin.body.user;
   franchise = await DB.createFranchise({
     name: uniqueName("Order Test Franchise"),
     admins: [{ email: adminUser.email }],
