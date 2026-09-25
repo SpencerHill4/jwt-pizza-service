@@ -1,6 +1,6 @@
 const request = require("supertest");
-const app = require("../service");
-const { Role, DB } = require("../database/database.js");
+const app = require("../src/service");
+const { Role, DB } = require("../src/database/database.js");
 
 function uniqueName(prefix) {
   return `${prefix} ${Math.random().toString(36).substring(2, 12)}`;

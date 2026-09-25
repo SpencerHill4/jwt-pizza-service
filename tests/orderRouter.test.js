@@ -1,7 +1,7 @@
 const request = require("supertest");
-const app = require("../service");
+const app = require("../src/service");
 const { Role, DB, createUser, login, uniqueName } = require("./testHelpers");
-const config = require("../config.js");
+const config = require("../src/config.js");
 
 let dinerUser;
 let dinerAuthToken;

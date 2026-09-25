@@ -1,5 +1,5 @@
 const request = require("supertest");
-const app = require("../service");
+const app = require("../src/service");
 
 const testUser = {
   name: "pizza diner",
