@@ -154,15 +154,33 @@ test("list users unauthorized", async () => {
   expect(listUsersRes.status).toBe(401);
 });
 
-test("list users", async () => {
+test("rejects a diner listing users", async () => {
   const listUsersRes = await request(app)
     .get("/api/user")
+    .query({ page: 1, limit: 10, name: "*" })
     .set("Authorization", `Bearer ${dinerAuthToken}`);
+
+  expect(listUsersRes.status).toBe(403);
+  expect(listUsersRes.body).toEqual({ message: "unauthorized" });
+});
+
+test("list users", async () => {
+  const user = await createUser();
+  const listUsersRes = await request(app)
+    .get("/api/user")
+    .query({ page: 1, limit: 10, name: user.name })
+    .set("Authorization", `Bearer ${adminAuthToken}`);
 
   expect(listUsersRes.status).toBe(200);
   expect(listUsersRes.body).toEqual({
-    message: "not implemented",
-    users: [],
     more: false,
+    users: [
+      expect.objectContaining({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        roles: expect.any(Array),
+      }),
+    ],
   });
 });
