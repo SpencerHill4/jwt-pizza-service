@@ -120,13 +120,26 @@ test("rejects an unauthenticated profile update", async () => {
   expect(updateRes.body).toEqual({ message: "unauthorized" });
 });
 
-test("delete user", async () => {
+test("allows an admin to delete another user", async () => {
+  const user = await createUser();
+
   const deleteRes = await request(app)
-    .delete(`/api/user/${dinerUser.id}`)
-    .set("Authorization", `Bearer ${dinerAuthToken}`);
+    .delete(`/api/user/${user.id}`)
+    .set("Authorization", `Bearer ${adminAuthToken}`);
 
   expect(deleteRes.status).toBe(200);
-  expect(deleteRes.body).toEqual({ message: "not implemented" });
+  expect(deleteRes.body).toEqual({ deleted: true });
+});
+
+test("rejects a diner deleting another user", async () => {
+  const otherUser = await createUser();
+
+  const deleteRes = await request(app)
+    .delete(`/api/user/${otherUser.id}`)
+    .set("Authorization", `Bearer ${dinerAuthToken}`);
+
+  expect(deleteRes.status).toBe(403);
+  expect(deleteRes.body).toEqual({ message: "unauthorized" });
 });
 
 test("user deletion unauthorized", async () => {
