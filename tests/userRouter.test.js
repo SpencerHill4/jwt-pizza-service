@@ -129,25 +129,27 @@ test("returns the delete-user placeholder for an authenticated user", async () =
   expect(deleteRes.body).toEqual({ message: "not implemented" });
 });
 
-test("returns the user-list placeholder for an authenticated user", async () => {
-  const listRes = await request(app)
+test("list users unauthorized", async () => {
+  const listUsersRes = await request(app).get("/api/user");
+  expect(listUsersRes.status).toBe(401);
+});
+
+test("list users", async () => {
+  const listUsersRes = await request(app)
     .get("/api/user")
     .set("Authorization", `Bearer ${dinerAuthToken}`);
 
-  expect(listRes.status).toBe(200);
-  expect(listRes.body).toEqual({
+  expect(listUsersRes.status).toBe(200);
+  expect(listUsersRes.body).toEqual({
     message: "not implemented",
     users: [],
     more: false,
   });
 });
 
-test("rejects unauthenticated user deletion and listing", async () => {
+test("rejects unauthenticated user deletion", async () => {
   const deleteRes = await request(app).delete(`/api/user/${dinerUser.id}`);
-  const listRes = await request(app).get("/api/user");
 
   expect(deleteRes.status).toBe(401);
   expect(deleteRes.body).toEqual({ message: "unauthorized" });
-  expect(listRes.status).toBe(401);
-  expect(listRes.body).toEqual({ message: "unauthorized" });
 });
