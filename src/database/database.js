@@ -167,6 +167,34 @@ class DB {
     }
   }
 
+  async listUsers(page = 1, limit = 10, nameFilter = '*') {
+    const connection = await this.getConnection();
+    try {
+      const pageNumber = Number(page) > 0 ? Number(page) : 1;
+      const limitNumber = Number(limit) > 0 ? Number(limit) : 10;
+      const offset = (pageNumber - 1) * limitNumber;
+      const normalizedFilter = (nameFilter ?? '*').replace(/\*/g, '%');
+
+      let users = await this.query(connection, `SELECT u.id, u.name, u.email FROM user AS u WHERE u.name LIKE ? ORDER BY u.id LIMIT ? OFFSET ?`, [normalizedFilter, limitNumber + 1, offset]);
+      const more = users.length > limitNumber;
+      if (more) {
+        users = users.slice(0, limitNumber);
+      }
+
+      for (const user of users) {
+        const roles = await this.query(connection, `SELECT role, objectId FROM userRole WHERE userId=?`, [user.id]);
+        user.roles = roles.map((role) => ({
+          role: role.role,
+          objectId: role.objectId || undefined,
+        }));
+      }
+
+      return [users, more];
+    } finally {
+      connection.end();
+    }
+  }
+
   async addDinerOrder(user, order) {
     const connection = await this.getConnection();
     try {
@@ -304,7 +332,7 @@ class DB {
   }
 
   getOffset(currentPage = 1, listPerPage) {
-    return (currentPage - 1) * [listPerPage];
+    return (currentPage - 1) * listPerPage;
   }
 
   getTokenSignature(token) {
