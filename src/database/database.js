@@ -167,12 +167,12 @@ class DB {
     }
   }
 
-  async listUsers(page = 1, limit = 10, nameFilter = '*') {
+  async listUsers(page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
     try {
-      const pageNumber = Number(page) > 0 ? Number(page) : 1;
+      const pageNumber = Number(page) >= 0 ? Number(page) : 0;
       const limitNumber = Number(limit) > 0 ? Number(limit) : 10;
-      const offset = (pageNumber - 1) * limitNumber;
+      const offset = pageNumber * limitNumber;
       const normalizedFilter = (nameFilter ?? '*').replace(/\*/g, '%');
 
       let users = await this.query(connection, `SELECT u.id, u.name, u.email FROM user AS u WHERE u.name LIKE ? ORDER BY u.id LIMIT ? OFFSET ?`, [normalizedFilter, limitNumber + 1, offset]);
