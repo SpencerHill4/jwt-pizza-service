@@ -3,6 +3,7 @@ const config = require('../config.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
+const { trackPizzaSale, trackPizzaCreation } = require('../metrics.js');
 
 const orderRouter = express.Router();
 
@@ -76,6 +77,7 @@ orderRouter.get(
 orderRouter.post(
   '/',
   authRouter.authenticateToken,
+  trackPizzaCreation,
   asyncHandler(async (req, res) => {
     const orderReq = req.body;
     const order = await DB.addDinerOrder(req.user, orderReq);
@@ -86,6 +88,7 @@ orderRouter.post(
     });
     const j = await r.json();
     if (r.ok) {
+      trackPizzaSale(order.items);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
