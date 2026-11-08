@@ -117,7 +117,13 @@ function removeActiveUser(userId) {
   activeUsers.delete(String(userId));
 }
 
-function trackPizzaSale(items) {
+function pizzaPurchase(success, latency, items) {
+  recordHistogram("pizza_creation_latency", latency, "ms");
+  if (!success) {
+    recordCounter("pizza_creation_failures", 1, "failures");
+    return;
+  }
+
   recordCounter("pizzas_sold", items.length, "pizzas");
   const revenue = items.reduce((total, item) => {
     const price = Number(item.price);
@@ -126,19 +132,26 @@ function trackPizzaSale(items) {
   recordCounter("pizza_revenue", revenue, "currency");
 }
 
-function trackPizzaCreation(req, res, next) {
+async function trackPizzaPurchase(factoryRequest, items) {
   const startedAt = process.hrtime.bigint();
-  res.once("finish", () => {
-    recordHistogram(
-      "pizza_creation_latency",
+  let response;
+  try {
+    response = await factoryRequest();
+  } catch (error) {
+    pizzaPurchase(
+      false,
       Number(process.hrtime.bigint() - startedAt) / 1e6,
-      "ms",
+      items,
     );
-    if (res.statusCode >= 400) {
-      recordCounter("pizza_creation_failures", 1, "failures");
-    }
-  });
-  next();
+    throw error;
+  }
+
+  pizzaPurchase(
+    response.ok,
+    Number(process.hrtime.bigint() - startedAt) / 1e6,
+    items,
+  );
+  return response;
 }
 
 function getCpuUsagePercentage() {
@@ -311,6 +324,5 @@ module.exports = {
   requestTracker,
   trackAuthenticationAttempt,
   removeActiveUser,
-  trackPizzaSale,
-  trackPizzaCreation,
+  trackPizzaPurchase,
 };
