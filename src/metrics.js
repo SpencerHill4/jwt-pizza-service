@@ -283,6 +283,10 @@ function sendMetrics() {
               key: "service.name",
               value: { stringValue: config.metrics.source },
             },
+            {
+              key: "service.instance.id",
+              value: { stringValue: `${os.hostname()}-${process.pid}` },
+            },
           ],
         },
         scopeMetrics: [
