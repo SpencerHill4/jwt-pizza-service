@@ -113,6 +113,10 @@ function trackAuthenticationAttempt(successful) {
   });
 }
 
+function removeActiveUser(userId) {
+  activeUsers.delete(String(userId));
+}
+
 function trackPizzaSale(items) {
   recordCounter("pizzas_sold", items.length, "pizzas");
   const revenue = items.reduce((total, item) => {
@@ -306,6 +310,7 @@ if (process.env.NODE_ENV !== "test") {
 module.exports = {
   requestTracker,
   trackAuthenticationAttempt,
+  removeActiveUser,
   trackPizzaSale,
   trackPizzaCreation,
 };
