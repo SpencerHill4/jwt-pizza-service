@@ -169,4 +169,4 @@ jobs:
           curl -s -X POST https://cordialshortbread159.grafana.net/api/annotations \
           -H "Authorization: Bearer ${{ secrets.GRAFANA_ACCESS_TOKEN }}" \
           -H "Content-Type: application/json" \
-          -d '{"dashboardUID":"spl2ptj", "panelId":6, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
+          -d '{"dashboardUID":"spl2ptj", "panelId":13, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
