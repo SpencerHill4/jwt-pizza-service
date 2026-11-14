@@ -6,12 +6,12 @@ class Logger {
     res.send = (resBody) => {
       const logData = {
         authorized: !!req.headers.authorization,
+        user: this.userInfo(req.user),
         path: req.originalUrl,
         method: req.method,
         statusCode: res.statusCode,
         reqBody: JSON.stringify(req.body),
         resBody: JSON.stringify(resBody),
-        user: req.user ? { id: req.user.id, name: req.user.name } : "",
       };
       const level = this.statusToLogLevel(res.statusCode);
       this.log(level, "http", logData);
@@ -20,6 +20,32 @@ class Logger {
     };
     next();
   };
+
+  dbLogger(query, user) {
+    this.log("info", "db", {
+      query,
+      user: this.userInfo(user),
+    });
+  }
+
+  factoryLogger(requestBody, responseBody, user) {
+    this.log("info", "factory", {
+      user: this.userInfo(user),
+      reqBody: JSON.stringify(requestBody),
+      resBody: JSON.stringify(responseBody),
+    });
+  }
+
+  unhandledErrorLogger(err) {
+    this.log("error", "unhandledError", {
+      message: err.message,
+      statusCode: err.statusCode,
+    });
+  }
+
+  userInfo(user) {
+    return user ? { id: user.id, name: user.name } : "";
+  }
 
   log(level, type, logData) {
     const labels = {
