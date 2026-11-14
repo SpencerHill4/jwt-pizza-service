@@ -1,4 +1,10 @@
 const config = require("./config");
+const { AsyncLocalStorage } = require("node:async_hooks");
+const sensitiveField =
+  /password|passwd|passphrase|secret|token|jwt|authorization|cookie|api[-_]?key|credential|email|phone|address|ssn|credit.?card|card.?number|cvv/i;
+const sensitiveText =
+  /(["']?)(password|passwd|passphrase|secret|token|jwt|authorization|cookie|api[-_]?key|credential|email|phone|address|ssn|credit.?card|card.?number|cvv)(["']?)\s*([:=])\s*("[^"]*"|'[^']*'|(?!\?)[^\s,;]+)/gi;
+const requestContext = new AsyncLocalStorage();
 
 class Logger {
   httpLogger = (req, res, next) => {
@@ -18,19 +24,19 @@ class Logger {
       res.send = send;
       return res.send(resBody);
     };
-    next();
+    requestContext.run({ req }, next);
   };
 
   dbLogger(query, user) {
     this.log("info", "db", {
       query,
-      user: this.userInfo(user),
+      user: this.userInfo(user ?? requestContext.getStore()?.req.user),
     });
   }
 
   factoryLogger(requestBody, responseBody, user) {
     this.log("info", "factory", {
-      user: this.userInfo(user),
+      user: this.userInfo(user ?? requestContext.getStore()?.req.user),
       reqBody: JSON.stringify(requestBody),
       resBody: JSON.stringify(responseBody),
     });
@@ -70,11 +76,51 @@ class Logger {
   }
 
   sanitize(logData) {
-    logData = JSON.stringify(logData);
-    return logData.replace(
-      /\\"password\\":\s*\\"[^"]*\\"/g,
-      '\\"password\\": \\"*****\\"',
+    return JSON.stringify(this.sanitizeValue(logData));
+  }
+
+  sanitizeValue(value, key) {
+    if (key && sensitiveField.test(key)) return "[REDACTED]";
+
+    if (typeof value === "string") {
+      if (key === "query") return this.sanitizeQuery(value);
+      if (key === "reqBody" || key === "resBody") {
+        try {
+          return JSON.stringify(this.sanitizeValue(JSON.parse(value)));
+        } catch {
+          return this.sanitizeString(value);
+        }
+      }
+      return this.sanitizeString(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeValue(item));
+    }
+
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([entryKey, entryValue]) => [
+          entryKey,
+          this.sanitizeValue(entryValue, entryKey),
+        ]),
+      );
+    }
+
+    return value;
+  }
+
+  sanitizeQuery(query) {
+    return this.sanitizeString(
+      query.replace(/'(?:''|\\.|[^'])*'|"(?:[^"]|"")*"/g, "?"),
     );
+  }
+
+  sanitizeString(value) {
+    return value
+      .replace(/\bBearer\s+[^\s"'<>]+/gi, "Bearer [REDACTED]")
+      .replace(sensitiveText, '$1$2$3$4[REDACTED]')
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED]");
   }
 
   sendLogToGrafana(event) {
